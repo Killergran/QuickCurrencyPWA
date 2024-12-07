@@ -1,0 +1,122 @@
+﻿@page "/"
+@page "/currency-exchange"
+@inject CurrencyService CurrencyService
+@inject NavigationManager NavigationManager
+
+<h3>Currency Exchange Rates</h3>
+
+<div>
+    <label for="fromCurrency">From:</label>
+    <select id="fromCurrency" @bind="SelectedFromCurrency">
+        @foreach (var currency in AvailableCurrencies)
+        {
+            <option value="@currency">@currency</option>
+        }
+    </select>
+</div>
+
+<div>
+    <label for="toCurrency">To:</label>
+    <select id="toCurrency" @bind="SelectedToCurrency">
+        @foreach (var currency in AvailableCurrencies)
+        {
+            <option value="@currency">@currency</option>
+        }
+    </select>
+</div>
+
+<input type="number" @bind="InputAmount" placeholder="Enter amount" />
+<p>Converted Amount: @ConvertedAmount</p>
+
+<ul>
+    @foreach (var exchange in CurrencyExchanges)
+    {
+        <li>@exchange.FromCurrency to @exchange.ToCurrency: @exchange.ExchangeRate</li>
+    }
+</ul>
+
+@code {
+    private decimal inputAmount;
+    private decimal convertedAmount;
+    private List<CurrencyExchangeClass> CurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
+    private List<string> AvailableCurrencies { get; set; } = new List<string> { "SEK", "USD", "EUR", "CNY", "RUB" };
+    private string SelectedFromCurrency { get; set; } = "SEK";
+    private string SelectedToCurrency { get; set; } = "USD";
+
+    public decimal InputAmount
+    {
+        get => inputAmount;
+        set
+        {
+            if (inputAmount != value)
+            {
+                inputAmount = value;
+                ConvertAmount();
+            }
+        }
+    }
+
+    public decimal ConvertedAmount
+    {
+        get => convertedAmount;
+        set
+        {
+            if (convertedAmount != value)
+            {
+                convertedAmount = value;
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrencyRates();
+    }
+
+    private async Task LoadCurrencyRates()
+    {
+        var apiKey = await GetApiKey(); // Replace with your actual API key
+        var response = await CurrencyService.GetCurrencyRatesAsync(apiKey, SelectedFromCurrency);
+
+        if (response != null && response.Result == "success")
+        {
+            var filteredRates = response.Conversion_Rates
+                .Where(rate => AvailableCurrencies.Contains(rate.Key))
+                .ToDictionary(rate => rate.Key, rate => rate.Value);
+
+            foreach (var rate in filteredRates)
+            {
+                decimal invertedRate = 1 / rate.Value;
+                CurrencyExchanges.Add(new CurrencyExchangeClass
+                    {
+                        FromCurrency = SelectedFromCurrency,
+                        ToCurrency = rate.Key,
+                        ExchangeRate = decimal.Parse(invertedRate.ToString("F2"))
+                    });
+            }
+        }
+    }
+
+    private void ConvertAmount()
+    {
+        var selectedExchange = CurrencyExchanges.FirstOrDefault(e => e.FromCurrency == SelectedFromCurrency && e.ToCurrency == SelectedToCurrency);
+        if (selectedExchange != null)
+        {
+            ConvertedAmount = InputAmount * selectedExchange.ExchangeRate;
+        }
+    }
+
+    private async Task<string> GetApiKey()
+    {
+        try
+        {
+            var client = new HttpClient { BaseAddress = new Uri(NavigationManager.BaseUri) };
+            var apiKey = await client.GetStringAsync("ApiKey.txt");
+            return apiKey.Trim();
+        }
+        catch (Exception)
+        {
+            return "Not_API_Key";
+        }
+    }
+}
