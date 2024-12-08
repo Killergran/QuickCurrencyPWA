@@ -2,6 +2,7 @@
 @page "/currency-exchange"
 @inject CurrencyService CurrencyService
 @inject NavigationManager NavigationManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
 <h3>Currency Exchange Rates</h3>
 
@@ -110,7 +111,26 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadCurrencyRates();
+        var isOnline = NavigationManager.Uri.StartsWith("http");
+
+        if (isOnline)
+        {
+            await LoadCurrencyRates();
+        }
+        else
+        {
+            // Load from local storage
+            CurrencyExchanges = await LocalStorage.GetItemAsync<List<CurrencyExchangeClass>>("CurrencyExchanges");
+            var lastUpdated = await LocalStorage.GetItemAsync<DateTime>("LastUpdated");
+
+            if (CurrencyExchanges == null)
+            {
+                CurrencyExchanges = new List<CurrencyExchangeClass>();
+            }
+
+            // Optionally, you can display the last updated time
+            Console.WriteLine($"Data last updated on: {lastUpdated}");
+        }
     }
 
     private async Task LoadCurrencyRates()
@@ -154,6 +174,9 @@
                     });
             }
         }
+        // Save to local storage
+        await LocalStorage.SetItemAsync("CurrencyExchanges", CurrencyExchanges);
+        await LocalStorage.SetItemAsync("LastUpdated", DateTime.UtcNow);
 
     }
 
