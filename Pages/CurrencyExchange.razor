@@ -8,7 +8,7 @@
 <div>
     <label for="fromCurrency">From:</label>
     <select id="fromCurrency" @bind="SelectedFromCurrency">
-        @foreach (var currency in AvailableCurrencies)
+        @foreach (var currency in AvailableFromCurrencies)
         {
             <option value="@currency">@currency</option>
         }
@@ -18,7 +18,15 @@
 <div>
     <label for="toCurrency">To:</label>
     <select id="toCurrency" @bind="SelectedToCurrency">
-        @foreach (var currency in AvailableCurrencies)
+        @if (SelectedFromCurrency == "SEK")
+        {
+            AvailableToCurrencies = AvailableCurrenciesForSEK;
+        }
+        else if (SelectedFromCurrency == "USD")
+        {
+            AvailableToCurrencies = AvailableCurrenciesForUSD;
+        }
+        @foreach (var currency in AvailableToCurrencies)
         {
             <option value="@currency">@currency</option>
         }
@@ -39,9 +47,15 @@
     private decimal inputAmount;
     private decimal convertedAmount;
     private List<CurrencyExchangeClass> CurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
+    private List<string> AvailableFromCurrencies { get; set; } = new List<string> { "SEK", "USD" };
     private List<string> AvailableCurrencies { get; set; } = new List<string> { "SEK", "USD", "EUR", "CNY", "RUB" };
-    private string SelectedFromCurrency { get; set; } = "SEK";
-    private string SelectedToCurrency { get; set; } = "USD";
+    private List<string> AvailableCurrenciesForSEK { get; set; } = new List<string> { "USD", "EUR", "CNY" };
+    private List<string> AvailableCurrenciesForUSD { get; set; } = new List<string> { "RUB" };
+    private List<string> AvailableToCurrencies { get; set; } = new List<string> { "USD", "EUR", "CNY" };
+
+
+    private string selectedFromCurrency = "SEK";
+    private string selectedToCurrency = "USD";
 
     public decimal InputAmount
     {
@@ -68,6 +82,32 @@
         }
     }
 
+    public string SelectedFromCurrency
+    {
+        get => selectedFromCurrency;
+        set
+        {
+            if (selectedFromCurrency != value)
+            {
+                selectedFromCurrency = value;
+                ConvertAmount();
+            }
+        }
+    }
+
+    public string SelectedToCurrency
+    {
+        get => selectedToCurrency;
+        set
+        {
+            if (selectedToCurrency != value)
+            {
+                selectedToCurrency = value;
+                ConvertAmount();
+            }
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCurrencyRates();
@@ -76,12 +116,12 @@
     private async Task LoadCurrencyRates()
     {
         var apiKey = await GetApiKey(); // Replace with your actual API key
-        var response = await CurrencyService.GetCurrencyRatesAsync(apiKey, SelectedFromCurrency);
+        var response = await CurrencyService.GetCurrencyRatesAsync(apiKey, "SEK");
 
         if (response != null && response.Result == "success")
         {
             var filteredRates = response.Conversion_Rates
-                .Where(rate => AvailableCurrencies.Contains(rate.Key))
+                .Where(rate => AvailableCurrenciesForSEK.Contains(rate.Key))
                 .ToDictionary(rate => rate.Key, rate => rate.Value);
 
             foreach (var rate in filteredRates)
@@ -89,12 +129,32 @@
                 decimal invertedRate = 1 / rate.Value;
                 CurrencyExchanges.Add(new CurrencyExchangeClass
                     {
-                        FromCurrency = SelectedFromCurrency,
+                        FromCurrency = "SEK",
                         ToCurrency = rate.Key,
                         ExchangeRate = decimal.Parse(invertedRate.ToString("F2"))
                     });
             }
         }
+
+        response = await CurrencyService.GetCurrencyRatesAsync(apiKey, "USD");
+
+        if (response != null && response.Result == "success")
+        {
+            var filteredRates = response.Conversion_Rates
+                .Where(rate => AvailableCurrenciesForUSD.Contains(rate.Key))
+                .ToDictionary(rate => rate.Key, rate => rate.Value);
+
+            foreach (var rate in filteredRates)
+            {
+                CurrencyExchanges.Add(new CurrencyExchangeClass
+                    {
+                        FromCurrency = "USD",
+                        ToCurrency = rate.Key,
+                        ExchangeRate = decimal.Parse(rate.Value.ToString("F2"))
+                    });
+            }
+        }
+
     }
 
     private void ConvertAmount()
