@@ -40,7 +40,7 @@
 <ul>
     @foreach (var exchange in CurrencyExchanges)
     {
-        <li>@exchange.FromCurrency to @exchange.ToCurrency: @exchange.ExchangeRate</li>
+        <li>@exchange.FromCurrency to @exchange.ToCurrency: @decimal.Parse(exchange.ExchangeRate.ToString("F2"))</li>
     }
 </ul>
 
@@ -146,13 +146,12 @@
 
             foreach (var rate in filteredRates)
             {
-                decimal invertedRate = 1 / rate.Value;
                 CurrencyExchanges.Add(new CurrencyExchangeClass
                     {
                         FromCurrency = "SEK",
                         ToCurrency = rate.Key,
-                        ExchangeRate = decimal.Parse(invertedRate.ToString("F2"))
-                    });
+                        ExchangeRate = rate.Value
+                    }.Inverted());
             }
         }
 
@@ -170,7 +169,7 @@
                     {
                         FromCurrency = "USD",
                         ToCurrency = rate.Key,
-                        ExchangeRate = decimal.Parse(rate.Value.ToString("F2"))
+                        ExchangeRate = rate.Value
                     });
             }
         }
