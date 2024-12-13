@@ -86,3 +86,44 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+body {
+    padding-top: 0;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 250px;
+    padding: 0;
+    background-color: #343a40;
+}
+
+    .sidebar .nav-link {
+        color: #cbd3da;
+    }
+
+        .sidebar .nav-link:hover {
+            color: #fff;
+        }
+
+.main {
+    margin-left: 250px;
+    padding: 1rem;
+}
+
+.top-row {
+    background-color: #343a40;
+    color: #fff;
+    padding: 0.5rem 1rem;
+}
+
+    .top-row a {
+        color: #fff;
+    }
+
+        .top-row a:hover {
+            color: #cbd3da;
+        }

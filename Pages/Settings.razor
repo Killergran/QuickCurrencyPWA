@@ -1,0 +1,95 @@
+﻿@page "/settings"
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<h3>Settings</h3>
+
+<p>Select the currencies you want to use:</p>
+
+<div>
+    <label for="fromCurrency">From Currency:</label>
+    <select id="fromCurrency" @bind="SelectedFromCurrency">
+        @foreach (var currency in AvailableCurrencies)
+        {
+            <option value="@currency.Code">@currency.Code - @currency.Name (@currency.Country)</option>
+        }
+    </select>
+</div>
+
+<div>
+    <label for="toCurrency">To Currency:</label>
+    <select id="toCurrency" @bind="SelectedToCurrency">
+        @foreach (var currency in AvailableCurrencies.Where(c => c.Code != SelectedFromCurrency))
+        {
+            <option value="@currency.Code">@currency.Code - @currency.Name (@currency.Country)</option>
+        }
+    </select>
+</div>
+
+<button @onclick="AddConversion">Add Conversion</button>
+
+<h4>Selected Conversions</h4>
+<ul>
+    @foreach (var conversion in SelectedConversions)
+    {
+        <li>
+            @conversion.FromCurrency to @conversion.ToCurrency
+            <button @onclick="() => RemoveConversion(conversion)">Remove</button>
+        </li>
+    }
+</ul>
+
+<button @onclick="SaveSettings">Save Settings</button>
+
+@code {
+    private List<Currency> AvailableCurrencies { get; set; } = new List<Currency>
+    {
+        new Currency { Code = "AED", Name = "UAE Dirham", Country = "United Arab Emirates" },
+        new Currency { Code = "AFN", Name = "Afghan Afghani", Country = "Afghanistan" },
+        // Add all other currencies here...
+        new Currency { Code = "ZWL", Name = "Zimbabwean Dollar", Country = "Zimbabwe" }
+    };
+
+    private string SelectedFromCurrency { get; set; }
+    private string SelectedToCurrency { get; set; }
+    private List<CurrencyConversion> SelectedConversions { get; set; } = new List<CurrencyConversion>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        SelectedFromCurrency = await LocalStorage.GetItemAsync<string>("SelectedFromCurrency") ?? "USD";
+        SelectedToCurrency = await LocalStorage.GetItemAsync<string>("SelectedToCurrency") ?? "EUR";
+        SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions") ?? new List<CurrencyConversion>();
+    }
+
+    private void AddConversion()
+    {
+        if (!SelectedConversions.Any(c => c.FromCurrency == SelectedFromCurrency && c.ToCurrency == SelectedToCurrency))
+        {
+            SelectedConversions.Add(new CurrencyConversion { FromCurrency = SelectedFromCurrency, ToCurrency = SelectedToCurrency });
+        }
+    }
+
+    private void RemoveConversion(CurrencyConversion conversion)
+    {
+        SelectedConversions.Remove(conversion);
+    }
+
+    private async Task SaveSettings()
+    {
+        await LocalStorage.SetItemAsync("SelectedFromCurrency", SelectedFromCurrency);
+        await LocalStorage.SetItemAsync("SelectedToCurrency", SelectedToCurrency);
+        await LocalStorage.SetItemAsync("SelectedConversions", SelectedConversions);
+    }
+
+    private class Currency
+    {
+        public string Code { get; set; }
+        public string Name { get; set; }
+        public string Country { get; set; }
+    }
+
+    private class CurrencyConversion
+    {
+        public string FromCurrency { get; set; }
+        public string ToCurrency { get; set; }
+    }
+}
