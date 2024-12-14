@@ -11,7 +11,7 @@
     <select id="fromCurrency" @bind="SelectedFromCurrency">
         @foreach (var currency in AvailableFromCurrencies)
         {
-            <option value="@currency">@currency</option>
+                <option value="@currency">@currency</option>
         }
     </select>
 </div>
@@ -19,17 +19,9 @@
 <div>
     <label for="toCurrency">To:</label>
     <select id="toCurrency" @bind="SelectedToCurrency">
-        @if (SelectedFromCurrency == "SEK")
-        {
-            AvailableToCurrencies = AvailableCurrenciesForSEK;
-        }
-        else if (SelectedFromCurrency == "USD")
-        {
-            AvailableToCurrencies = AvailableCurrenciesForUSD;
-        }
         @foreach (var currency in AvailableToCurrencies)
         {
-            <option value="@currency">@currency</option>
+                <option value="@currency">@currency</option>
         }
     </select>
 </div>
@@ -38,22 +30,20 @@
 <p>Converted Amount: @ConvertedAmount</p>
 
 <ul>
-    @foreach (var exchange in CurrencyExchanges)
+    @foreach (var exchange in DisplayedCurrencyExchanges)
     {
-        <li>@exchange.FromCurrency to @exchange.ToCurrency: @decimal.Parse(exchange.ExchangeRate.ToString("F2"))</li>
+            <li>@exchange.FromCurrency to @exchange.ToCurrency: @decimal.Parse(exchange.ExchangeRate.ToString("F2"))</li>
     }
 </ul>
 
 @code {
     private decimal inputAmount;
     private decimal convertedAmount;
+    private List<string> AvailableFromCurrencies { get; set; } = new List<string>();
+    private List<string> AvailableToCurrencies { get; set; } = new List<string>();
     private List<CurrencyExchangeClass> CurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
-    private List<string> AvailableFromCurrencies { get; set; } = new List<string> { "SEK", "USD" };
-    private List<string> AvailableCurrencies { get; set; } = new List<string> { "SEK", "USD", "EUR", "CNY", "DKK", "RUB" };
-    private List<string> AvailableCurrenciesForSEK { get; set; } = new List<string> { "USD", "EUR", "DKK", "CNY" };
-    private List<string> AvailableCurrenciesForUSD { get; set; } = new List<string> { "RUB" };
-    private List<string> AvailableToCurrencies { get; set; } = new List<string> { "USD", "EUR", "CNY" };
-
+    private List<CurrencyConversion> SelectedConversions { get; set; } = new List<CurrencyConversion>();
+    private List<CurrencyExchangeClass> DisplayedCurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
 
     private string selectedFromCurrency = "SEK";
     private string selectedToCurrency = "USD";
@@ -91,6 +81,7 @@
             if (selectedFromCurrency != value)
             {
                 selectedFromCurrency = value;
+                UpdateAvailableToCurrencies();
                 ConvertAmount();
             }
         }
@@ -131,57 +122,47 @@
             // Optionally, you can display the last updated time
             Console.WriteLine($"Data last updated on: {lastUpdated}");
         }
+
+        // Load selected conversions from local storage
+        SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions") ?? new List<CurrencyConversion>();
+        UpdateAvailableFromCurrencies();
+        UpdateAvailableToCurrencies();
+        FilterDisplayedCurrencyExchanges();
     }
 
     private async Task LoadCurrencyRates()
     {
         var apiKey = await GetApiKey(); // Replace with your actual API key
-        var response = await CurrencyService.GetCurrencyRatesAsync(apiKey, "SEK");
+        var currenciesToLoad = CurrenciesToLoad(SelectedConversions);
 
-        if (response != null && response.Result == "success")
+        foreach (var currency in currenciesToLoad)
         {
-            var filteredRates = response.Conversion_Rates
-                .Where(rate => AvailableCurrenciesForSEK.Contains(rate.Key))
-                .ToDictionary(rate => rate.Key, rate => rate.Value);
-
-            foreach (var rate in filteredRates)
+            var response = await CurrencyService.GetCurrencyRatesAsync(apiKey, currency);
+            if (response != null && response.Result == "success")
             {
-                CurrencyExchanges.Add(new CurrencyExchangeClass
-                    {
-                        FromCurrency = "SEK",
-                        ToCurrency = rate.Key,
-                        ExchangeRate = rate.Value
-                    }.Inverted());
+                foreach (var rate in response.Conversion_Rates)
+                {
+                    CurrencyExchanges.Add(new CurrencyExchangeClass
+                        {
+                            FromCurrency = currency,
+                            ToCurrency = rate.Key,
+                            ExchangeRate = rate.Value,
+                            LastUpdated = DateTime.Parse(response.Time_Last_Update_Utc)
+                        });
+                }
             }
         }
 
-        response = await CurrencyService.GetCurrencyRatesAsync(apiKey, "USD");
-
-        if (response != null && response.Result == "success")
-        {
-            var filteredRates = response.Conversion_Rates
-                .Where(rate => AvailableCurrenciesForUSD.Contains(rate.Key))
-                .ToDictionary(rate => rate.Key, rate => rate.Value);
-
-            foreach (var rate in filteredRates)
-            {
-                CurrencyExchanges.Add(new CurrencyExchangeClass
-                    {
-                        FromCurrency = "USD",
-                        ToCurrency = rate.Key,
-                        ExchangeRate = rate.Value
-                    });
-            }
-        }
         // Save to local storage
         await LocalStorage.SetItemAsync("CurrencyExchanges", CurrencyExchanges);
         await LocalStorage.SetItemAsync("LastUpdated", DateTime.UtcNow);
 
+        FilterDisplayedCurrencyExchanges();
     }
 
     private void ConvertAmount()
     {
-        var selectedExchange = CurrencyExchanges.FirstOrDefault(e => e.FromCurrency == SelectedFromCurrency && e.ToCurrency == SelectedToCurrency);
+        var selectedExchange = DisplayedCurrencyExchanges.FirstOrDefault(e => e.FromCurrency == SelectedFromCurrency && e.ToCurrency == SelectedToCurrency);
         if (selectedExchange != null)
         {
             ConvertedAmount = InputAmount * selectedExchange.ExchangeRate;
@@ -200,5 +181,44 @@
         {
             return "Not_API_Key";
         }
+    }
+
+    private List<string> CurrenciesToLoad(List<CurrencyConversion> selectedConversions)
+    {
+        return selectedConversions
+            .SelectMany(c => new[] { c.FromCurrency, c.ToCurrency })
+            .Distinct()
+            .ToList();
+    }
+
+    private void UpdateAvailableFromCurrencies()
+    {
+        AvailableFromCurrencies = SelectedConversions
+            .SelectMany(c => new[] { c.FromCurrency, c.ToCurrency })
+            .Distinct()
+            .ToList();
+    }
+
+    private void UpdateAvailableToCurrencies()
+    {
+        AvailableToCurrencies = SelectedConversions
+            .Where(c => c.FromCurrency == SelectedFromCurrency || c.ToCurrency == SelectedFromCurrency)
+            .SelectMany(c => new[] { c.FromCurrency, c.ToCurrency })
+            .Where(c => c != SelectedFromCurrency)
+            .Distinct()
+            .ToList();
+    }
+
+    private void FilterDisplayedCurrencyExchanges()
+    {
+        DisplayedCurrencyExchanges = CurrencyExchanges
+            .Where(e => SelectedConversions.Any(c => c.FromCurrency == e.FromCurrency && c.ToCurrency == e.ToCurrency))
+            .ToList();
+    }
+
+    private class CurrencyConversion
+    {
+        public string FromCurrency { get; set; }
+        public string ToCurrency { get; set; }
     }
 }
