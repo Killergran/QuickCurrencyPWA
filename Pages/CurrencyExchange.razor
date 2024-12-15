@@ -11,7 +11,7 @@
     <select id="fromCurrency" @bind="SelectedFromCurrency">
         @foreach (var currency in AvailableFromCurrencies)
         {
-                <option value="@currency">@currency</option>
+            <option value="@currency">@currency</option>
         }
     </select>
 </div>
@@ -21,7 +21,7 @@
     <select id="toCurrency" @bind="SelectedToCurrency">
         @foreach (var currency in AvailableToCurrencies)
         {
-                <option value="@currency">@currency</option>
+            <option value="@currency">@currency</option>
         }
     </select>
 </div>
@@ -32,7 +32,7 @@
 <ul>
     @foreach (var exchange in DisplayedCurrencyExchanges)
     {
-            <li>@exchange.FromCurrency to @exchange.ToCurrency: @decimal.Parse(exchange.ExchangeRate.ToString("F2"))</li>
+        <li>@exchange.FromCurrency to @exchange.ToCurrency: @decimal.Parse(exchange.ExchangeRate.ToString("F2"))</li>
     }
 </ul>
 
@@ -41,7 +41,8 @@
     private decimal convertedAmount;
     private List<string> AvailableFromCurrencies { get; set; } = new List<string>();
     private List<string> AvailableToCurrencies { get; set; } = new List<string>();
-    private List<CurrencyExchangeClass> CurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
+    private List<CurrencyExchangeClass> AllCurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
+    private List<CurrencyExchangeClass> RequestedCurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
     private List<CurrencyConversion> SelectedConversions { get; set; } = new List<CurrencyConversion>();
     private List<CurrencyExchangeClass> DisplayedCurrencyExchanges { get; set; } = new List<CurrencyExchangeClass>();
 
@@ -102,7 +103,13 @@
 
     protected override async Task OnInitializedAsync()
     {
+        System.Diagnostics.Debug.WriteLine("LoadCurrencyRates");
+
         var isOnline = NavigationManager.Uri.StartsWith("http");
+        System.Diagnostics.Debug.WriteLine(isOnline.ToString());
+
+        // Load selected conversions from local storage
+        SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions") ?? new List<CurrencyConversion>();
 
         if (isOnline)
         {
@@ -111,20 +118,24 @@
         else
         {
             // Load from local storage
-            CurrencyExchanges = await LocalStorage.GetItemAsync<List<CurrencyExchangeClass>>("CurrencyExchanges");
+            AllCurrencyExchanges = await LocalStorage.GetItemAsync<List<CurrencyExchangeClass>>("AllCurrencyExchanges");
+            RequestedCurrencyExchanges = await LocalStorage.GetItemAsync<List<CurrencyExchangeClass>>("RequestedCurrencyExchanges");
             var lastUpdated = await LocalStorage.GetItemAsync<DateTime>("LastUpdated");
 
-            if (CurrencyExchanges == null)
+            if (AllCurrencyExchanges == null)
             {
-                CurrencyExchanges = new List<CurrencyExchangeClass>();
+                AllCurrencyExchanges = new List<CurrencyExchangeClass>();
+            }
+
+            if (RequestedCurrencyExchanges == null)
+            {
+                RequestedCurrencyExchanges = new List<CurrencyExchangeClass>();
             }
 
             // Optionally, you can display the last updated time
             Console.WriteLine($"Data last updated on: {lastUpdated}");
         }
 
-        // Load selected conversions from local storage
-        SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions") ?? new List<CurrencyConversion>();
         UpdateAvailableFromCurrencies();
         UpdateAvailableToCurrencies();
         FilterDisplayedCurrencyExchanges();
@@ -132,6 +143,8 @@
 
     private async Task LoadCurrencyRates()
     {
+        System.Diagnostics.Debug.WriteLine("LoadCurrencyRates");
+
         var apiKey = await GetApiKey(); // Replace with your actual API key
         var currenciesToLoad = CurrenciesToLoad(SelectedConversions);
 
@@ -140,9 +153,10 @@
             var response = await CurrencyService.GetCurrencyRatesAsync(apiKey, currency);
             if (response != null && response.Result == "success")
             {
+                System.Diagnostics.Debug.WriteLine("Got Success on API call!");
                 foreach (var rate in response.Conversion_Rates)
                 {
-                    CurrencyExchanges.Add(new CurrencyExchangeClass
+                    AllCurrencyExchanges.Add(new CurrencyExchangeClass
                         {
                             FromCurrency = currency,
                             ToCurrency = rate.Key,
@@ -151,10 +165,14 @@
                         });
                 }
             }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to get data from API");
+            }
         }
 
         // Save to local storage
-        await LocalStorage.SetItemAsync("CurrencyExchanges", CurrencyExchanges);
+        await LocalStorage.SetItemAsync("AllCurrencyExchanges", AllCurrencyExchanges);
         await LocalStorage.SetItemAsync("LastUpdated", DateTime.UtcNow);
 
         FilterDisplayedCurrencyExchanges();
@@ -211,9 +229,14 @@
 
     private void FilterDisplayedCurrencyExchanges()
     {
-        DisplayedCurrencyExchanges = CurrencyExchanges
+        RequestedCurrencyExchanges = AllCurrencyExchanges
             .Where(e => SelectedConversions.Any(c => c.FromCurrency == e.FromCurrency && c.ToCurrency == e.ToCurrency))
             .ToList();
+
+        DisplayedCurrencyExchanges = RequestedCurrencyExchanges;
+
+        // Save requested conversions to local storage
+        LocalStorage.SetItemAsync("RequestedCurrencyExchanges", RequestedCurrencyExchanges);
     }
 
     private class CurrencyConversion
