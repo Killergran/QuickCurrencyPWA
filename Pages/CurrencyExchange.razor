@@ -83,6 +83,13 @@
             {
                 selectedFromCurrency = value;
                 UpdateAvailableToCurrencies();
+
+                // Automatically update the ToCurrency if it matches the new FromCurrency
+                if (SelectedToCurrency == selectedFromCurrency)
+                {
+                    SelectedToCurrency = AvailableToCurrencies.FirstOrDefault();
+                }
+
                 ConvertAmount();
             }
         }
@@ -180,10 +187,24 @@
 
     private void ConvertAmount()
     {
-        var selectedExchange = DisplayedCurrencyExchanges.FirstOrDefault(e => e.FromCurrency == SelectedFromCurrency && e.ToCurrency == SelectedToCurrency);
+        var selectedExchange = AllCurrencyExchanges.FirstOrDefault(e =>
+            (e.FromCurrency == SelectedFromCurrency && e.ToCurrency == SelectedToCurrency) ||
+            (e.FromCurrency == SelectedToCurrency && e.ToCurrency == SelectedFromCurrency));
+
         if (selectedExchange != null)
         {
-            ConvertedAmount = InputAmount * selectedExchange.ExchangeRate;
+            if (selectedExchange.FromCurrency == SelectedFromCurrency && selectedExchange.ToCurrency == SelectedToCurrency)
+            {
+                ConvertedAmount = InputAmount * selectedExchange.ExchangeRate;
+            }
+            else if (selectedExchange.FromCurrency == SelectedToCurrency && selectedExchange.ToCurrency == SelectedFromCurrency)
+            {
+                ConvertedAmount = InputAmount / selectedExchange.ExchangeRate;
+            }
+        }
+        else
+        {
+            ConvertedAmount = 0; // Handle case where no exchange rate is found
         }
     }
 
