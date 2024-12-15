@@ -27,6 +27,7 @@
 </div>
 
 <input type="number" @bind="InputAmount" @bind:event="oninput" placeholder="Enter amount" />
+<p>Converted Amount: @decimal.Parse(ConvertedAmount.ToString("F2"))</p>
 
 <ul>
     @foreach (var exchange in DisplayedCurrencyExchanges)
