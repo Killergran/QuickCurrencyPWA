@@ -26,8 +26,7 @@
     </select>
 </div>
 
-<input type="number" @bind="InputAmount" placeholder="Enter amount" />
-<p>Converted Amount: @ConvertedAmount</p>
+<input type="number" @bind="InputAmount" @bind:event="oninput" placeholder="Enter amount" />
 
 <ul>
     @foreach (var exchange in DisplayedCurrencyExchanges)
