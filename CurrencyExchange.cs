@@ -1,35 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace QuickCurrencyPWA
+﻿namespace QuickCurrencyPWA
 {
-
+    [Serializable]
     public class CurrencyExchanges
     {
-        private List<CurrencyExchangeClass> CurrencyExchangeList { get; set; }
+        public List<CurrencyExchangeClass> CurrencyExchangeList { get; set; }
+
         public CurrencyExchanges()
         {
             CurrencyExchangeList = [];
         }
 
-        public void Update(string fromCurrency,  string toCurrency, decimal exchangeRate, DateTime updateTime)
-        { 
+        public void Update(string fromCurrency, string toCurrency, decimal exchangeRate, DateTime updateTime)
+        {
             if (fromCurrency == toCurrency)
             {
-                throw new Exception("Cannot update exchange rate for the same currency");
+                throw new ArgumentException("Cannot update exchange rate for the same currency");
             }
             if (exchangeRate <= 0)
             {
-                throw new Exception("Exchange rate must be greater than 0");
+                throw new ArgumentException("Exchange rate must be greater than 0");
             }
             if (fromCurrency != "SEK")
             {
-                throw new Exception("From currency must be SEK");
+                throw new ArgumentException("From currency must be SEK");
             }
             var exchange = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency);
             if (exchange == null)
@@ -55,34 +48,26 @@ namespace QuickCurrencyPWA
             {
                 return 1;
             }
-            
-            if (fromCurrency !=  "SEK" && toCurrency != "SEK")
+
+            if (fromCurrency != "SEK" && toCurrency != "SEK")
             {
-                CurrencyExchangeClass fromRate1 = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == fromCurrency);
-                CurrencyExchangeClass toRate2 = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency);
+                var fromRate1 = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == fromCurrency);
+                var toRate2 = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency);
                 if (fromRate1 == null || toRate2 == null)
                 {
                     throw new Exception("Exchange rate not found");
                 }
-                return fromRate1.ExchangeRate * toRate2.ExchangeRate;
+                return toRate2.ExchangeRate / fromRate1.ExchangeRate;
             }
-            if(fromCurrency == "SEK")
+            if (fromCurrency == "SEK")
             {
-                CurrencyExchangeClass toRate = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency);
-                if (toRate == null)
-                {
-                    throw new Exception("Exchange rate not found");
-                }
-                return toRate.ExchangeRate;
+                var toRate = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency);
+                return toRate == null ? throw new Exception("Exchange rate not found") : toRate.ExchangeRate;
             }
             if (toCurrency == "SEK")
             {
-                CurrencyExchangeClass fromRate = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == fromCurrency);
-                if (fromRate == null)
-                {
-                    throw new Exception("Exchange rate not found");
-                }
-                return 1 / fromRate.ExchangeRate;
+                var fromRate = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == fromCurrency);
+                return fromRate == null ? throw new Exception("Exchange rate not found") : 1 / fromRate.ExchangeRate;
             }
             return 0;
         }
@@ -111,19 +96,24 @@ namespace QuickCurrencyPWA
             }
             if (toCurrency == "SEK")
             {
-                return CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == fromCurrency).Inverted();
+                var exchange = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == fromCurrency);
+                return exchange == null ? throw new Exception("Exchange rate not found") : exchange.Inverted();
             }
-            return new CurrencyExchangeClass
+            var toCurrencyExchange = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency);
+            return toCurrencyExchange == null
+                ? throw new Exception("Exchange rate not found")
+                : new CurrencyExchangeClass
             {
                 FromCurrency = fromCurrency,
                 ToCurrency = toCurrency,
                 ExchangeRate = GetExchangeRate(fromCurrency, toCurrency),
-                LastUpdated = CurrencyExchangeList.FirstOrDefault(x => x.ToCurrency == toCurrency).LastUpdated
+                LastUpdated = toCurrencyExchange.LastUpdated
             };
         }
     }
 
-        public class CurrencyExchangeClass
+    [Serializable]
+    public class CurrencyExchangeClass
     {
         public string FromCurrency { get; set; }
         public string ToCurrency { get; set; }
@@ -151,9 +141,9 @@ namespace QuickCurrencyPWA
             {
                 ExchangeRate = 1 / this.ExchangeRate,
                 FromCurrency = this.ToCurrency,
-                ToCurrency = this.FromCurrency
+                ToCurrency = this.FromCurrency,
+                LastUpdated = this.LastUpdated
             };
         }
     }
-    
 }

@@ -38,8 +38,6 @@
     }
 </ul>
 
-<button @onclick="SaveSettings">Save Settings</button>
-
 @code {
     private List<Currency> AvailableCurrencies { get; set; } = new List<Currency>
     {
@@ -217,17 +215,19 @@
         SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions") ?? new List<CurrencyConversion>();
     }
 
-    private void AddConversion()
+    private async void AddConversion()
     {
         if (!SelectedConversions.Any(c => c.FromCurrency == SelectedFromCurrency && c.ToCurrency == SelectedToCurrency))
         {
             SelectedConversions.Add(new CurrencyConversion { FromCurrency = SelectedFromCurrency, ToCurrency = SelectedToCurrency });
+            await SaveSettings();
         }
     }
 
-    private void RemoveConversion(CurrencyConversion conversion)
+    private async void RemoveConversion(CurrencyConversion conversion)
     {
         SelectedConversions.Remove(conversion);
+        await SaveSettings();
     }
 
     private async Task SaveSettings()
