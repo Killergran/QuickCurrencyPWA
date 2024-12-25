@@ -133,21 +133,8 @@
         var isOnline = NavigationManager.Uri.StartsWith("http");
 
         // Load selected conversions from local storage
-        try
-        {   
-            SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions") 
-                ?? new List<CurrencyConversion>();
-            AllCurrencyExchanges = await LocalStorage.GetItemAsync<CurrencyExchanges>("AllCurrencyExchanges") 
-                ?? new CurrencyExchanges();
-            RequestedCurrencyExchanges = await LocalStorage.GetItemAsync<List<CurrencyExchangeClass>>("RequestedCurrencyExchanges") 
-                ?? new List<CurrencyExchangeClass>();
-            var lastUpdated = await LocalStorage.GetItemAsync<DateTime>("LastUpdated");
-            TestData = lastUpdated;
-            TestDataExchanges = AllCurrencyExchanges.GetExchangeRate("SEK", "USD");
-        }
-        catch
-        {
-        }
+
+        await LoadDataFromStorage();
 
         if (isOnline && AllCurrencyExchanges.IsStale())
         {
@@ -163,6 +150,25 @@
         UpdateAvailableFromCurrencies();
         UpdateAvailableToCurrencies();
         
+    }
+
+    private async Task LoadDataFromStorage()
+    {
+        try
+        {
+            SelectedConversions = await LocalStorage.GetItemAsync<List<CurrencyConversion>>("SelectedConversions")
+                ?? new List<CurrencyConversion>();
+            AllCurrencyExchanges = await LocalStorage.GetItemAsync<CurrencyExchanges>("AllCurrencyExchanges")
+                ?? new CurrencyExchanges();
+            RequestedCurrencyExchanges = await LocalStorage.GetItemAsync<List<CurrencyExchangeClass>>("RequestedCurrencyExchanges")
+                ?? new List<CurrencyExchangeClass>();
+            var lastUpdated = await LocalStorage.GetItemAsync<DateTime>("LastUpdated");
+            TestData = lastUpdated;
+            TestDataExchanges = AllCurrencyExchanges.GetExchangeRate("SEK", "USD");
+        }
+        catch
+        {
+        }
     }
 
     private async Task LoadCurrencyRates()
